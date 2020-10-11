@@ -9,11 +9,11 @@ Luckily Alice and Bob are security savvy and just had lectures on advanced crypt
 
 Your assignment is to do the following steps help Alice and Bob:
 
-### 1. Design a protocol that allows Alice an Bob to throw a virtual 6 sided dice over the insecure network even though they do not trust each other.
+##### 1. Design a protocol that allows Alice an Bob to throw a virtual 6 sided dice over the insecure network even though they do not trust each other.
 
-### 2. Explain why your protocol is secure using concepts from the lectures.
+##### 2. Explain why your protocol is secure using concepts from the lectures.
 
-### 3. Implement your virtual dice protocol in a programming language of your choosing. The implementation must consist of a program representing Alice and another program representing Bob that communicate over a network (two processes running on localhost is ok). You can use any libraries or programming languages of your choosing.
+##### 3. Implement your virtual dice protocol in a programming language of your choosing. The implementation must consist of a program representing Alice and another program representing Bob that communicate over a network (two processes running on localhost is ok). You can use any libraries or programming languages of your choosing.
 
 You must hand in a report explaining your protocol and why it is secure as well as the code implementing your protocol.
 
