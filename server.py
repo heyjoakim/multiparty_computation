@@ -10,12 +10,20 @@ server.bind(address)
 
 # Handle connections
 server.listen(10)
-print("[Server started]", "at", host, "on port", port)
+print(f"[Server started at {host} on port {port}]")
 
 while True:
+    # Accept connection from client
     client_socket, address = server.accept()
-    print(f"Connection from {address} has been established.")
+    print(f"Connection from {address} has been established...")
+
+    # Send message to client
     client_socket.send(bytes("Hey client", "utf-8"))
-    client_socket.close()
+
+    # Receive message from client
+    client_message = client_socket.recv(1024).decode('utf-8')
+    print("<Client> ", client_message)
+
+client_socket.close()
 
 
