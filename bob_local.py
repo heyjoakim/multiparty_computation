@@ -30,7 +30,6 @@ def retrieve_alice_pk():
 def decrypt_and_verify(data, PK):
     decrypted_message = MyCryptoLibrary.decrypt_message(data[0], bob_private_key)
     MyCryptoLibrary.verify_message(decrypted_message, data[1], PK)
-    #print(f"<Bob> decrypted the message '{decrypted_message}'")
     if type(decrypted_message) is tuple:
         test = pickle.loads(decrypted_message)
         print(test)

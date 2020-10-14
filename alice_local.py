@@ -58,27 +58,26 @@ while running:
     # Get prerequisites
     PK_bob = retrieve_bobs_pk()
 
-    # [i] message received
+    # [1] message received
     received_data = pickle.loads(server.recv(2048))
     decrypt_and_verify(received_data, PK_bob)
 
-    # [ii] Send message Com(a,r) to Bob
-    a = '009'
+    # [2] Send message Com(a,r) to Bob
+    a = '009'  # Alice not honest!!!!!!!!!!!!!!!!
     r = '01000100101101000010111001110111101010111111001011111'
     c = bytes(a + r, encoding="utf-8")
     c_hashed = MyCryptoLibrary.hash_message(c)
-    print(c_hashed)
     send_encrypted_signed_message(c_hashed, PK_bob)
 
-    # [iii] message received
+    # [3] message Com(a,r) received from Bob
     received_data2 = pickle.loads((server.recv(2048)))
     decrypt_and_verify(received_data2, PK_bob)
 
-    # [iiii] send second message (a,r) to Bob
+    # [4] send second message (a,r) to Bob
     a_r = bytes(a + "," + r, encoding="utf-8")
     send_encrypted_signed_message(a_r, PK_bob)
 
-
+    # [5] second message (a,r) received from Bob
 
     running = False
     server.close()
