@@ -1,3 +1,4 @@
+from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.exceptions import InvalidSignature
@@ -48,3 +49,11 @@ class MyCryptoLibrary:
 
         except InvalidSignature:
             print("[WARNING INVALID SIGNATURE!!!]")
+
+    @staticmethod
+    def hash_message(msg):
+        m = hashes.Hash(hashes.SHA256(), backend=default_backend())
+        m.update(msg)
+        m_hashed = m.finalize()
+        return m_hashed
+

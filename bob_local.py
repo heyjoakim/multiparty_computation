@@ -1,13 +1,11 @@
 """" Server (localhost) """
 import socket, pickle
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import padding, rsa
-from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import serialization, asymmetric
 from lib.MyCryptoLibrary import MyCryptoLibrary
 
 # Key generation
-bob_private_key = rsa.generate_private_key(
+bob_private_key = asymmetric.rsa.generate_private_key(
     public_exponent=65537,
     key_size=2048,
     backend=default_backend())
@@ -29,6 +27,26 @@ def retrieve_alice_pk():
         return PK
 
 
+def decrypt_and_verify(data, PK):
+    decrypted_message = MyCryptoLibrary.decrypt_message(data[0], bob_private_key)
+    MyCryptoLibrary.verify_message(decrypted_message, data[1], PK)
+    #print(f"<Bob> decrypted the message '{decrypted_message}'")
+    if type(decrypted_message) is tuple:
+        test = pickle.loads(decrypted_message)
+        print(test)
+        return test
+    else:
+        return decrypted_message
+
+
+def send_encrypted_signed_message(msg, PK):
+    cipher_text = MyCryptoLibrary.encrypt_message(msg, PK)
+    signature_alice = MyCryptoLibrary.sign_message(msg, bob_private_key)
+    data = (cipher_text, signature_alice)
+    data_string = pickle.dumps(data)
+    client_socket.send(data_string)
+
+
 # TCP socket with ipv4
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 host = "127.0.0.1"; port = 6677
@@ -41,7 +59,6 @@ running = True
 print(f"[Server started at {host} on port {port}]")
 
 # Creating the message to send
-message = b'I once coded some Java. But it was an Island in Indonesia'
 
 while running:
     # Accept connection from client
@@ -52,24 +69,34 @@ while running:
     PK_alice = retrieve_alice_pk()
 
     # Send message to client
-    cipher_text = MyCryptoLibrary.encrypt_message(message, PK_alice)
-    signature_bob = MyCryptoLibrary.sign_message(message, bob_private_key)
-
-    # Preparing data to be send
-    data = (cipher_text, signature_bob)
-    data_string = pickle.dumps(data)
-
-    client_socket.send(data_string)
+    message = b'I once coded some Java. But it was an Island in Indonesia'
+    send_encrypted_signed_message(message, PK_alice)
 
     # Receive message from client
     received_data = pickle.loads(client_socket.recv(2048))
-    decrypted_client_message = MyCryptoLibrary.decrypt_message(received_data[0], bob_private_key)
-    MyCryptoLibrary.verify_message(decrypted_client_message, received_data[1], PK_alice)
-    print(f"<Bob> decrypted the message '{decrypted_client_message.decode('utf-8')}'")
-    running = False
+    decrypted_hashed_c_from_alice = decrypt_and_verify(received_data, PK_alice)
 
     # Message 2
+    message2 = b' Hi i am message2 from Bob'
+    send_encrypted_signed_message(message, PK_alice)
 
+    # Receive second message (a,r) from Alice
+    received_data2 = pickle.loads((client_socket.recv(2048)))
+    decrypted_a_r = decrypt_and_verify(received_data2, PK_alice)
+    decoded_split_a_r = decrypted_a_r.decode("utf-8").split(",")
+    opened_commitment = bytes(decoded_split_a_r[0] + decoded_split_a_r[1], "utf-8")
+
+    # Hashing a + r for checking
+    opened_commitment_hashed = MyCryptoLibrary.hash_message(opened_commitment)
+
+    if decrypted_hashed_c_from_alice == opened_commitment_hashed:
+        print("[Success] No changes we made to the message")
+        alice_a = decoded_split_a_r[0]
+        print("Alice's a was: ", alice_a)
+    else:
+        print("[WARNING] Alice changed her message")
+
+    running = False
     client_socket.close()
 
 

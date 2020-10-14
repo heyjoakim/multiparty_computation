@@ -1,14 +1,12 @@
 """" Alice (localhost) """
 import socket, pickle, random
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import padding, rsa
-from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import serialization, asymmetric
 from lib.MyCryptoLibrary import MyCryptoLibrary
 
 
 # Key generation
-alice_private_key = rsa.generate_private_key(
+alice_private_key = asymmetric.rsa.generate_private_key(
     public_exponent=65537,
     key_size=2048,
     backend=default_backend())
@@ -30,6 +28,21 @@ def retrieve_bobs_pk():
         return PK
 
 
+def decrypt_and_verify(data, PK):
+    decrypted_message = MyCryptoLibrary.decrypt_message(data[0], alice_private_key)
+    MyCryptoLibrary.verify_message(decrypted_message, data[1], PK)
+    print(f"<Alice> decrypted the message '{decrypted_message.decode('utf-8')}'")
+    return decrypted_message
+
+
+def send_encrypted_signed_message(msg, PK):
+    cipher_text = MyCryptoLibrary.encrypt_message(msg, PK)
+    signature_alice = MyCryptoLibrary.sign_message(msg, alice_private_key)
+    data = (cipher_text, signature_alice)
+    data_string = pickle.dumps(data)
+    server.send(data_string)
+
+
 # TCP with ipv4
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 host = "127.0.0.1"; port = 6677
@@ -40,29 +53,32 @@ server.connect(address)
 running = True
 print(f"[Connected to {host} at port {port}]")
 
-# Creating the message to be send
-message = b"Linux fanboys are the new gangsters"  # Encoded in bytes
-
 
 while running:
     # Get prerequisites
     PK_bob = retrieve_bobs_pk()
 
-    # Receive from server
+    # [i] message received
     received_data = pickle.loads(server.recv(2048))
-    decrypted_server_message = MyCryptoLibrary.decrypt_message(received_data[0], alice_private_key)
-    print("<Bob> ", decrypted_server_message.decode("utf-8"))
-    MyCryptoLibrary.verify_message(decrypted_server_message, received_data[1], PK_bob)
-    print(f"<Alice> decrypted the message '{decrypted_server_message.decode('utf-8')}'")
+    decrypt_and_verify(received_data, PK_bob)
 
-    # Send message to server
-    cipher_text = MyCryptoLibrary.encrypt_message(message, PK_bob)
-    signature_alice = MyCryptoLibrary.sign_message(message, alice_private_key)
+    # [ii] Send message Com(a,r) to Bob
+    a = '009'
+    r = '01000100101101000010111001110111101010111111001011111'
+    c = bytes(a + r, encoding="utf-8")
+    c_hashed = MyCryptoLibrary.hash_message(c)
+    print(c_hashed)
+    send_encrypted_signed_message(c_hashed, PK_bob)
 
-    # Sending message encrypted and signed
-    data = (cipher_text, signature_alice)
-    data_string = pickle.dumps(data)
-    server.send(data_string)
+    # [iii] message received
+    received_data2 = pickle.loads((server.recv(2048)))
+    decrypt_and_verify(received_data2, PK_bob)
+
+    # [iiii] send second message (a,r) to Bob
+    a_r = bytes(a + "," + r, encoding="utf-8")
+    send_encrypted_signed_message(a_r, PK_bob)
+
+
+
     running = False
-
     server.close()
