@@ -35,7 +35,6 @@ cipher_text = PK_bob.encrypt(
     padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()),
                  algorithm=hashes.SHA256(),
                  label=None))
-
 # SIGNING
 signature = alice_private_key.sign(
     message_bytes,
