@@ -4,6 +4,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.exceptions import InvalidSignature
+from lib.MyCryptoLibrary import MyCryptoLibrary
 
 # Key generation
 bob_private_key = rsa.generate_private_key(
@@ -16,7 +17,7 @@ bob_key_pem = bob_private_key.public_key().public_bytes(
     encoding=serialization.Encoding.PEM,
     format=serialization.PublicFormat.SubjectPublicKeyInfo)
 
-with open("../Alice/PK_bob.pem", "wb") as key:
+with open("PK_bob.pem", "wb") as key:
     key.write(bob_key_pem)
 
 
@@ -26,50 +27,6 @@ def retrieve_alice_pk():
             pem_file.read(),
             backend=default_backend())
         return PK
-
-
-def encrypt_message(msg, PK):
-    cipher = PK.encrypt(
-        msg,
-        padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                     algorithm=hashes.SHA256(),
-                     label=None))
-    return cipher
-
-
-def decrypt_message(msg):
-    d_cipher = bob_private_key.decrypt(
-        msg,
-        padding.OAEP(
-            mgf=padding.MGF1(algorithm=hashes.SHA256()),
-            algorithm=hashes.SHA256(),
-            label=None))
-    return d_cipher
-
-
-def sign_message(msg):
-    signature = bob_private_key.sign(
-        msg,
-        padding.PSS(
-            mgf=padding.MGF1(hashes.SHA256()),
-            salt_length=padding.PSS.MAX_LENGTH
-        ), hashes.SHA256())
-    return signature
-
-
-def verify_message(msg, signature, PK):
-    try:
-        PK.verify(
-            signature,
-            msg,
-            padding.PSS(
-                mgf=padding.MGF1(hashes.SHA256()),
-                salt_length=padding.PSS.MAX_LENGTH
-            ), hashes.SHA256())
-        print("[MESSAGE VERIFIED]")
-
-    except InvalidSignature:
-        print("[WARNING INVALID SIGNATURE!!!]")
 
 
 # TCP socket with ipv4
@@ -95,8 +52,8 @@ while running:
     PK_alice = retrieve_alice_pk()
 
     # Send message to client
-    cipher_text = encrypt_message(message,PK_alice)
-    signature_bob = sign_message(message)
+    cipher_text = MyCryptoLibrary.encrypt_message(message, PK_alice)
+    signature_bob = MyCryptoLibrary.sign_message(message, bob_private_key)
 
     # Preparing data to be send
     data = (cipher_text, signature_bob)
@@ -106,10 +63,12 @@ while running:
 
     # Receive message from client
     received_data = pickle.loads(client_socket.recv(2048))
-    decrypted_client_message = decrypt_message(received_data[0])
-    verify_message(decrypted_client_message, received_data[1], PK_alice)
+    decrypted_client_message = MyCryptoLibrary.decrypt_message(received_data[0], bob_private_key)
+    MyCryptoLibrary.verify_message(decrypted_client_message, received_data[1], PK_alice)
     print(f"<Bob> decrypted the message '{decrypted_client_message.decode('utf-8')}'")
     running = False
+
+    # Message 2
 
     client_socket.close()
 

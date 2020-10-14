@@ -3,8 +3,9 @@ from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.exceptions import InvalidSignature
 
 
-class CryptoLibrary:
+class MyCryptoLibrary:
 
+    @staticmethod
     def encrypt_message(msg, PK):
         cipher = PK.encrypt(
             msg,
@@ -13,6 +14,7 @@ class CryptoLibrary:
                          label=None))
         return cipher
 
+    @staticmethod
     def decrypt_message(msg, private_key):
         d_cipher = private_key.decrypt(
             msg,
@@ -22,6 +24,7 @@ class CryptoLibrary:
                 label=None))
         return d_cipher
 
+    @staticmethod
     def sign_message(msg, private_key):
         signature = private_key.sign(
             msg,
@@ -31,6 +34,7 @@ class CryptoLibrary:
             ), hashes.SHA256())
         return signature
 
+    @staticmethod
     def verify_message(msg, signature, PK):
         try:
             PK.verify(
