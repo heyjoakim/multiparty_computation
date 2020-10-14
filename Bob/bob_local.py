@@ -1,43 +1,89 @@
 """" Server (localhost) """
 import socket
+import pickle
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.exceptions import InvalidSignature
 
 # Key generation
-server_private_key = rsa.generate_private_key(
+bob_private_key = rsa.generate_private_key(
     public_exponent=65537,
     key_size=2048,
     backend=default_backend())
-PK_server = server_private_key.public_key()
+
+# Assuming that Alice has bob's PK, thus saving it as PEM format to Alice's PC.
+bob_key_pem = bob_private_key.public_key().public_bytes(
+    encoding=serialization.Encoding.PEM,
+    format=serialization.PublicFormat.SubjectPublicKeyInfo)
+
+with open("../Alice/PK_bob.pem", "wb") as key:
+    key.write(bob_key_pem)
 
 
+def retrieve_alice_pk():
+    with open("PK_alice.pem", "rb") as pem_file:
+        PK = serialization.load_pem_public_key(
+            pem_file.read(),
+            backend=default_backend())
+        return PK
+
+
+def decrypt_message(msg):
+    d_cipher = bob_private_key.decrypt(
+        msg,
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None))
+    return d_cipher
+
+
+def verify_message(msg, signature, PK):
+    try:
+        PK.verify(
+            signature,
+            msg,
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ), hashes.SHA256())
+        print("[MESSAGE VERIFIED]")
+
+    except InvalidSignature:
+        print("[WARNING INVALID SIGNATURE!!!]")
 
 
 # TCP socket with ipv4
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
 host = "127.0.0.1"; port = 6677
 address = (host, port)
 server.bind(address)
 
 # Handle connections
-server.listen(10)
+server.listen(2048)
+running = True
 print(f"[Server started at {host} on port {port}]")
 
-while exec:
+while running:
     # Accept connection from client
     client_socket, address = server.accept()
     print(f"Connection from {address} has been established...")
 
+    # Get prerequisites
+    PK_alice = retrieve_alice_pk()
+
     # Send message to client
-    client_socket.send(bytes("Hey client this is my PK", "utf-8"))
-    client_socket.send(bytes(str(PK_server), "utf-8"))
+    client_socket.send(bytes("Hey Alice", "utf-8"))
 
     # Receive message from client
-    client_message = client_socket.recv(1024).decode('utf-8')
-    print("<Client> ", client_message)
-    exec = False
+    data = pickle.loads(client_socket.recv(2048))
+    decrypted_client_message = decrypt_message(data[0])
+    verify_message(decrypted_client_message, data[1], PK_alice)
+    print(f"<Bob> decrypted the message '{decrypted_client_message.decode('utf-8')}'")
+    running = False
 
 client_socket.close()
 
