@@ -23,10 +23,9 @@ server.bind(address)
 
 # Handle connections
 server.listen(10)
-running = True
 print(f"[Server started at {host} on port {port}]")
 
-while running:
+while exec:
     # Accept connection from client
     client_socket, address = server.accept()
     print(f"Connection from {address} has been established...")
@@ -38,7 +37,7 @@ while running:
     # Receive message from client
     client_message = client_socket.recv(1024).decode('utf-8')
     print("<Client> ", client_message)
-    running = False
+    exec = False
 
 client_socket.close()
 
