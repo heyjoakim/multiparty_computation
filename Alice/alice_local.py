@@ -1,11 +1,9 @@
 """" Alice (localhost) """
-import socket
-import pickle
-from cryptography.exceptions import InvalidSignature
+import socket, pickle, random
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.asymmetric import padding, rsa
+from cryptography.exceptions import InvalidSignature
 
 # Key generation
 alice_private_key = rsa.generate_private_key(
@@ -39,6 +37,16 @@ def encrypt_message(msg, PK):
     return cipher
 
 
+def decrypt_message(msg):
+    d_cipher = alice_private_key.decrypt(
+        msg,
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None))
+    return d_cipher
+
+
 def sign_message(msg):
     signature = alice_private_key.sign(
         msg,
@@ -47,6 +55,21 @@ def sign_message(msg):
             salt_length=padding.PSS.MAX_LENGTH
         ), hashes.SHA256())
     return signature
+
+
+def verify_message(msg, signature, PK):
+    try:
+        PK.verify(
+            signature,
+            msg,
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ), hashes.SHA256())
+        print("[MESSAGE VERIFIED]")
+
+    except InvalidSignature:
+        print("[WARNING INVALID SIGNATURE!!!]")
 
 
 # TCP with ipv4
@@ -62,13 +85,17 @@ print(f"[Connected to {host} at port {port}]")
 # Creating the message to be send
 message = b"Linux fanboys are the new gangsters"  # Encoded in bytes
 
-while running:
-    # Receive from server
-    server_message = server.recv(2048)
-    print("<Bob> ", server_message.decode("utf-8"))
 
+while running:
     # Get prerequisites
     PK_bob = retrieve_bobs_pk()
+
+    # Receive from server
+    received_data = pickle.loads(server.recv(2048))
+    decrypted_server_message = decrypt_message(received_data[0])
+    print("<Bob> ", decrypted_server_message.decode("utf-8"))
+    verify_message(decrypted_server_message, received_data[1], PK_bob)
+    print(f"<Alice> decrypted the message '{decrypted_server_message.decode('utf-8')}'")
 
     # Send message to server
     cipher_text = encrypt_message(message, PK_bob)
@@ -80,4 +107,4 @@ while running:
     server.send(data_string)
     running = False
 
-server.close()
+    server.close()

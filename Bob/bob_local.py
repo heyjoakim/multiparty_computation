@@ -1,11 +1,8 @@
 """" Server (localhost) """
-import socket
-import pickle
+import socket, pickle
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.exceptions import InvalidSignature
 
 # Key generation
@@ -31,6 +28,15 @@ def retrieve_alice_pk():
         return PK
 
 
+def encrypt_message(msg, PK):
+    cipher = PK.encrypt(
+        msg,
+        padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                     algorithm=hashes.SHA256(),
+                     label=None))
+    return cipher
+
+
 def decrypt_message(msg):
     d_cipher = bob_private_key.decrypt(
         msg,
@@ -39,6 +45,16 @@ def decrypt_message(msg):
             algorithm=hashes.SHA256(),
             label=None))
     return d_cipher
+
+
+def sign_message(msg):
+    signature = bob_private_key.sign(
+        msg,
+        padding.PSS(
+            mgf=padding.MGF1(hashes.SHA256()),
+            salt_length=padding.PSS.MAX_LENGTH
+        ), hashes.SHA256())
+    return signature
 
 
 def verify_message(msg, signature, PK):
@@ -67,6 +83,9 @@ server.listen(2048)
 running = True
 print(f"[Server started at {host} on port {port}]")
 
+# Creating the message to send
+message = b'I once coded some Java. But it was an Island in Indonesia'
+
 while running:
     # Accept connection from client
     client_socket, address = server.accept()
@@ -76,15 +95,22 @@ while running:
     PK_alice = retrieve_alice_pk()
 
     # Send message to client
-    client_socket.send(bytes("Hey Alice", "utf-8"))
+    cipher_text = encrypt_message(message,PK_alice)
+    signature_bob = sign_message(message)
+
+    # Preparing data to be send
+    data = (cipher_text, signature_bob)
+    data_string = pickle.dumps(data)
+
+    client_socket.send(data_string)
 
     # Receive message from client
-    data = pickle.loads(client_socket.recv(2048))
-    decrypted_client_message = decrypt_message(data[0])
-    verify_message(decrypted_client_message, data[1], PK_alice)
+    received_data = pickle.loads(client_socket.recv(2048))
+    decrypted_client_message = decrypt_message(received_data[0])
+    verify_message(decrypted_client_message, received_data[1], PK_alice)
     print(f"<Bob> decrypted the message '{decrypted_client_message.decode('utf-8')}'")
     running = False
 
-client_socket.close()
+    client_socket.close()
 
 
