@@ -66,6 +66,7 @@ while running:
 
     # Get prerequisites
     PK_alice = retrieve_alice_pk()
+    # TODO bob sends random sample b to Alice
 
     # Send message to client
     message = b'I once coded some Java. But it was an Island in Indonesia'
