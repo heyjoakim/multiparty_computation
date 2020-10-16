@@ -1,4 +1,4 @@
-"""" Alice (localhost) """
+""" Alice (localhost) """
 import socket, pickle, random
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, asymmetric
@@ -97,7 +97,6 @@ while running:
     # [a2] Alice sends random bit a to Bob
     a2 = bytes(format(random.getrandbits(4), "b"), encoding="utf-8")
     send_encrypted_signed_message(a2, PK_bob)
-    print(f"Alice sends {a2} to Bob")
 
     # [a3] Receive second message (a,r) from Bob
     received_data3 = pickle.loads((server.recv(2048)))
@@ -117,7 +116,7 @@ while running:
         alice_a = a2.decode("utf-8")
         compute_dice_throw(alice_a, bob_b)
     else:
-        print("[WARNING] Alice changed her message")
+        print("[WARNING] Bob changed his message")
 
     running = False
 
