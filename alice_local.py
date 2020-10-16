@@ -31,7 +31,6 @@ def retrieve_bobs_pk():
 def decrypt_and_verify(data, PK):
     decrypted_message = MyCryptoLibrary.decrypt_message(data[0], alice_private_key)
     MyCryptoLibrary.verify_message(decrypted_message, data[1], PK)
-    print(f"<Alice> decrypted the message '{decrypted_message.decode('utf-8')}'")
     return decrypted_message
 
 
@@ -41,6 +40,13 @@ def send_encrypted_signed_message(msg, PK):
     data = (cipher_text, signature_alice)
     data_string = pickle.dumps(data)
     server.send(data_string)
+
+
+def compute_dice_throw(a, b):
+    dice_throw = bin(int(a) ^ int(b))
+    converted_dice_throw = (int(dice_throw, 2) % 6) + 1
+    print("Alice computes throw to be ", converted_dice_throw)
+    return converted_dice_throw
 
 
 # TCP with ipv4
@@ -58,26 +64,61 @@ while running:
     # Get prerequisites
     PK_bob = retrieve_bobs_pk()
 
-    # [1] message received
+    print("********* Alice's dice throw *********")
+
+    # [a1] Alice samples random bit a and random 128 bit string and sends Com(a,r)
+    a1 = '1001'  # Alice not honest!!!!!!!!!!!!!!!!
+    r1 = format(random.getrandbits(128), "b")
+    c1 = bytes(a1 + r1, encoding="utf-8")
+    c_hashed1 = MyCryptoLibrary.hash_message(c1)
+    send_encrypted_signed_message(c_hashed1, PK_bob)
+    print("Sending encrypted Com(a,r) to Bob")
+
+    # [a2] Message b received
     received_data = pickle.loads(server.recv(2048))
-    decrypt_and_verify(received_data, PK_bob)
+    print("Alice received b from Bob and tries to verify")
+    b1 = decrypt_and_verify(received_data, PK_bob)
 
-    # [2] Send message Com(a,r) to Bob
-    a = '009'  # Alice not honest!!!!!!!!!!!!!!!!
-    r = '01000100101101000010111001110111101010111111001011111'
-    c = bytes(a + r, encoding="utf-8")
-    c_hashed = MyCryptoLibrary.hash_message(c)
-    send_encrypted_signed_message(c_hashed, PK_bob)
-
-    # [3] message Com(a,r) received from Bob
-    received_data2 = pickle.loads((server.recv(2048)))
-    decrypt_and_verify(received_data2, PK_bob)
-
-    # [4] send second message (a,r) to Bob
-    a_r = bytes(a + "," + r, encoding="utf-8")
+    # [a3] Alice sends (a,r) to Bob
+    a_r = bytes(a1 + "," + r1, encoding="utf-8")
     send_encrypted_signed_message(a_r, PK_bob)
 
-    # [5] second message (a,r) received from Bob
+    # [a4] Compute output a XOR b under mod 6
+    compute_dice_throw(a1, b1)
+
+    print()
+    print("********* Bob's dice throw *********")
+
+    # [a1] Message Com(a,r) received from Bob
+    received_data2 = pickle.loads(server.recv(2048))
+    print("Bob received Com(a,r) from Alice and tries to verify")
+    decrypted_hashed_c_from_bob = decrypt_and_verify(received_data2, PK_bob)
+
+    # [a2] Alice sends random bit a to Bob
+    a2 = bytes(format(random.getrandbits(4), "b"), encoding="utf-8")
+    send_encrypted_signed_message(a2, PK_bob)
+    print(f"Alice sends {a2} to Bob")
+
+    # [a3] Receive second message (a,r) from Bob
+    received_data3 = pickle.loads((server.recv(2048)))
+    print("Alice received (a,r) from Bob and tries to verify")
+    decrypted_b_r = decrypt_and_verify(received_data3, PK_bob)
+    decoded_split_b_r = decrypted_b_r.decode("utf-8").split(",")
+    bob_b2 = decoded_split_b_r[0]
+    opened_commitment = bytes(decoded_split_b_r[0] + decoded_split_b_r[1], "utf-8")
+
+    # [a4] Alice is hashing a + r for checking and computing dice throw
+    opened_commitment_hashed = MyCryptoLibrary.hash_message(opened_commitment)
+
+    if decrypted_hashed_c_from_bob == opened_commitment_hashed:
+        print("Alice is checking if the hashes match")
+        print("[Success] No changes we made to the message")
+        bob_b = decoded_split_b_r[0]
+        alice_a = a2.decode("utf-8")
+        compute_dice_throw(alice_a, bob_b)
+    else:
+        print("[WARNING] Alice changed her message")
 
     running = False
-    server.close()
+
+server.close()

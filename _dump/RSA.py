@@ -109,6 +109,9 @@ if H_hashed == c_hashed_decrypted:
     print("[Success] No changes we made to the message")
     dice_throw_alice = bin(int(a)^int(bob_a))
     dice_throw_bob = bin(int(bob_a)^int(a))
+    print("bob", dice_throw_bob)
+    print("alice", dice_throw_alice)
+
 
     # Convert the binary strings back to integers
     converted_dice_throw_alice = (int(dice_throw_alice, 2) % 6) + 1

@@ -56,4 +56,3 @@ class MyCryptoLibrary:
         m.update(msg)
         m_hashed = m.finalize()
         return m_hashed
-

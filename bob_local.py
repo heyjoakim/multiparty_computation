@@ -1,5 +1,5 @@
-"""" Server (localhost) """
-import socket, pickle
+"""" Bob (localhost) """
+import socket, pickle, random
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, asymmetric
 from lib.MyCryptoLibrary import MyCryptoLibrary
@@ -30,12 +30,7 @@ def retrieve_alice_pk():
 def decrypt_and_verify(data, PK):
     decrypted_message = MyCryptoLibrary.decrypt_message(data[0], bob_private_key)
     MyCryptoLibrary.verify_message(decrypted_message, data[1], PK)
-    if type(decrypted_message) is tuple:
-        test = pickle.loads(decrypted_message)
-        print(test)
-        return test
-    else:
-        return decrypted_message
+    return decrypted_message
 
 
 def send_encrypted_signed_message(msg, PK):
@@ -44,6 +39,13 @@ def send_encrypted_signed_message(msg, PK):
     data = (cipher_text, signature_alice)
     data_string = pickle.dumps(data)
     client_socket.send(data_string)
+
+
+def compute_dice_throw(b, a):
+    dice_throw = bin(int(b) ^ int(a))
+    converted_dice_throw = (int(dice_throw, 2) % 6) + 1
+    print("Bob computes throw to be ", converted_dice_throw)
+    return converted_dice_throw
 
 
 # TCP socket with ipv4
@@ -66,37 +68,64 @@ while running:
 
     # Get prerequisites
     PK_alice = retrieve_alice_pk()
-    # TODO bob sends random sample b to Alice
 
-    # Send message to client
-    message = b'I once coded some Java. But it was an Island in Indonesia'
-    send_encrypted_signed_message(message, PK_alice)
+    print("********* Alice's dice throw *********")
 
-    # Receive message from client
+    # [b1] Message Com(a,r) received from alice
     received_data = pickle.loads(client_socket.recv(2048))
+    print("Bob received Com(a,r) from Alice and tries to verify")
     decrypted_hashed_c_from_alice = decrypt_and_verify(received_data, PK_alice)
 
-    # Message 2
-    message2 = b' Hi i am message2 from Bob'
-    send_encrypted_signed_message(message, PK_alice)
+    # [b2] Bob sends random bit b to Alice
+    b1 = bytes(format(random.getrandbits(4), "b"), encoding="utf-8")
+    send_encrypted_signed_message(b1, PK_alice)
+    print(f"Bob sends {b1} to Alice")
 
-    # Receive second message (a,r) from Alice
+    # [b3] Receive second message (a,r) from Alice
     received_data2 = pickle.loads((client_socket.recv(2048)))
+    print("Bob received (a,r) from Alice and tries to verify")
     decrypted_a_r = decrypt_and_verify(received_data2, PK_alice)
     decoded_split_a_r = decrypted_a_r.decode("utf-8").split(",")
+    alice_a1 = decoded_split_a_r[0]
     opened_commitment = bytes(decoded_split_a_r[0] + decoded_split_a_r[1], "utf-8")
 
-    # Hashing a + r for checking
+    # [b4] Bob is hashing a + r for checking and computing dice throw
     opened_commitment_hashed = MyCryptoLibrary.hash_message(opened_commitment)
 
     if decrypted_hashed_c_from_alice == opened_commitment_hashed:
+        print("Bob is checking if the hashes match")
         print("[Success] No changes we made to the message")
         alice_a = decoded_split_a_r[0]
-        print("Alice's a was: ", alice_a)
+        bob_b = b1.decode("utf-8")
+        compute_dice_throw(bob_b, alice_a)
     else:
         print("[WARNING] Alice changed her message")
 
+    print()
+    print("********* Bob's dice throw *********")
+
+    # [b1] Bob samples random bit b and random 128 bit string and sends Com(a,r)
+    b2 = format(random.getrandbits(4), "b")
+    r2 = format(random.getrandbits(128), "b")
+    c2 = bytes(b2 + r2, encoding="utf-8")
+    c_hashed2 = MyCryptoLibrary.hash_message(c2)
+    send_encrypted_signed_message(c_hashed2, PK_alice)
+    print("Sending encrypted Com(a,r) to Alice")
+
+    # [b2] Message a received
+    received_data3 = pickle.loads(client_socket.recv(2048))
+    print("Alice received b from Bob and tries to verify")
+    a2 = decrypt_and_verify(received_data3, PK_alice)
+
+    # [b3] Bob sends (a,r) to Alice
+    b_r = bytes(b2 + "," + r2, encoding="utf-8")
+    send_encrypted_signed_message(b_r, PK_alice)
+
+    # [b4] Compute output B XOR a under mod 6
+    compute_dice_throw(b2, a2)
+
     running = False
-    client_socket.close()
+
+client_socket.close()
 
 
